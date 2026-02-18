@@ -1,4 +1,4 @@
-﻿import pyautogui
+import pyautogui
 
 from utils.math_utils import clamp
 
@@ -59,6 +59,12 @@ class CursorController:
     def left_click(self) -> None:
         pyautogui.click(_pause=False)
 
+    def right_click(self) -> None:
+        pyautogui.click(button="right", _pause=False)
+
+    def double_click(self) -> None:
+        pyautogui.doubleClick(_pause=False)
+
     def drag_down(self) -> None:
         pyautogui.mouseDown(button="left", _pause=False)
 
@@ -67,3 +73,24 @@ class CursorController:
 
     def scroll(self, amount: int) -> None:
         pyautogui.scroll(amount, _pause=False)
+
+    def zoom(self, amount: int) -> None:
+        if amount == 0:
+            return
+        pyautogui.keyDown("ctrl", _pause=False)
+        pyautogui.scroll(amount, _pause=False)
+        pyautogui.keyUp("ctrl", _pause=False)
+
+    def minimize_window(self) -> None:
+        pyautogui.hotkey("win", "down", _pause=False)
+        pyautogui.hotkey("win", "down", _pause=False)
+
+    def maximize_window(self) -> None:
+        pyautogui.hotkey("win", "up", _pause=False)
+
+    def close_window(self) -> None:
+        pyautogui.hotkey("alt", "f4", _pause=False)
+
+    def show_all_windows(self) -> None:
+        """Show task view / all open windows (Win+Tab on Windows)."""
+        pyautogui.hotkey("win", "tab", _pause=False)
