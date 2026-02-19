@@ -10,6 +10,14 @@ from modules.hand_tracker import HandTracker
 from modules.smoothing import CursorSmoother
 
 
+def _draw_semi_transparent_rect(frame, x1: int, y1: int, x2: int, y2: int, color_bgr, alpha: float):
+    """Draw a semi-transparent rectangle on frame (in-place)."""
+    roi = frame[y1:y2, x1:x2]
+    overlay = roi.copy()
+    cv2.rectangle(overlay, (0, 0), (x2 - x1, y2 - y1), color_bgr, -1)
+    cv2.addWeighted(overlay, alpha, roi, 1.0 - alpha, 0, roi)
+
+
 def draw_status(frame, fps: float, tracking: bool, gesture: str, dragging: bool, paused: bool):
     if not tracking:
         status_text = "Hand Lost"
@@ -21,11 +29,20 @@ def draw_status(frame, fps: float, tracking: bool, gesture: str, dragging: bool,
         status_text = "Pen Active"
         status_color = (0, 200, 0)
 
-    cv2.rectangle(frame, (10, 10), (470, 130), (20, 20, 20), -1)
-    cv2.putText(frame, f"FPS: {fps:.1f}", (20, 38), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 220, 255), 2)
-    cv2.putText(frame, f"Status: {status_text}", (20, 62), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
-    cv2.putText(frame, f"Gesture: {gesture}", (20, 86), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2)
-    cv2.putText(frame, f"Drag: {'ON' if dragging else 'OFF'}", (20, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+    h, w = frame.shape[:2]
+    margin = 16
+    box_w, box_h = 320, 110
+    x1 = w - box_w - margin
+    y1 = h - box_h - margin
+    x2, y2 = x1 + box_w, y1 + box_h
+
+    _draw_semi_transparent_rect(frame, x1, y1, x2, y2, (20, 20, 20), 0.65)
+    line_h = 26
+    base_y = y1 + 24
+    cv2.putText(frame, f"FPS: {fps:.1f}", (x1 + 12, base_y), cv2.FONT_HERSHEY_SIMPLEX, 0.65, (0, 220, 255), 2)
+    cv2.putText(frame, f"Status: {status_text}", (x1 + 12, base_y + line_h), cv2.FONT_HERSHEY_SIMPLEX, 0.6, status_color, 2)
+    cv2.putText(frame, f"Gesture: {gesture}", (x1 + 12, base_y + 2 * line_h), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 200, 0), 2)
+    cv2.putText(frame, f"Drag: {'ON' if dragging else 'OFF'}", (x1 + 12, base_y + 3 * line_h), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
 
 def draw_gesture_demo(frame):
@@ -169,7 +186,8 @@ def main():
             tracking = bool(hands)
             paused = gesture_result["paused"]
 
-            if gesture_result["pen_active"] and not paused:
+            # Move cursor only when pointing (not when scrolling or zooming) so scroll doesn't move cursor
+            if gesture_result["pen_active"] and not paused and not gesture_result["scroll_mode"]:
                 pen_x, pen_y = gesture_result["pen_point"]
                 target = cursor.map_pen_to_screen(pen_x, pen_y)
                 smoothed = smoother.update(target)
@@ -215,6 +233,11 @@ def main():
             if demo_pinned or time.time() <= demo_until:
                 draw_gesture_demo(frame)
 
+            if CFG.display_scale != 1.0:
+                h, w = frame.shape[:2]
+                display_w = int(w * CFG.display_scale)
+                display_h = int(h * CFG.display_scale)
+                frame = cv2.resize(frame, (display_w, display_h), interpolation=cv2.INTER_LINEAR)
             cv2.imshow("Touchless Cursor (Pen + Gestures)", frame)
             key = cv2.waitKey(1) & 0xFF
             if key == 27:

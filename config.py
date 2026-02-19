@@ -1,4 +1,4 @@
-﻿from dataclasses import dataclass
+from dataclasses import dataclass
 
 
 @dataclass(frozen=True)
@@ -7,6 +7,8 @@ class Config:
     camera_index: int = 0
     frame_width: int = 1280
     frame_height: int = 720
+    # Scale factor for display window (e.g. 1.35 = 35% larger).
+    display_scale: float = 1.35
 
     # MediaPipe hand tracking quality.
     hand_min_detection_confidence: float = 0.6
@@ -27,7 +29,7 @@ class Config:
     draw_hand_handedness: bool = True
 
     # Cursor mapping and speed tuning.
-    cursor_sensitivity_x: float = 1.05
+    cursor_sensitivity_x: float = 1.5 #1.05
     cursor_sensitivity_y: float = 1.0
     invert_x: bool = False
     invert_y: bool = False

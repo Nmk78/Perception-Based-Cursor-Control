@@ -69,6 +69,7 @@ class GestureController:
         self._pointer_scroll_started_at: float = 0.0
         self._pointer_scroll_active: bool = False
         self._previous_pointer_scroll_y = None
+        self._scroll_smoothed: float = 0.0  # for smooth scroll output
 
     @staticmethod
     def _finger_up(hand_landmarks, tip_idx: int, pip_idx: int) -> bool:
@@ -460,6 +461,7 @@ class GestureController:
             if pointer_scroll_requires_gesture_rest and gesture_landmarks is not None and not result["gesture_resting"]:
                 self._pointer_scroll_active = False
                 self._previous_pointer_scroll_y = None
+                self._scroll_smoothed = 0.0
             else:
                 p_index_up, p_middle_up, p_ring_up, p_pinky_up = self._finger_states(pointer_landmarks)
                 pointer_two_fingers = p_index_up and p_middle_up and not p_ring_up and not p_pinky_up
@@ -467,16 +469,25 @@ class GestureController:
                     if not self._pointer_scroll_active:
                         self._pointer_scroll_active = True
                         self._pointer_scroll_started_at = now
+                        self._scroll_smoothed = 0.0
                     if now - self._pointer_scroll_started_at >= self.hold_seconds:
                         result["scroll_mode"] = True
-                        index_y = pointer_landmarks.landmark[TIP_IDS["index"]].y
+                        # Use average of index and middle finger for stable direction (finger direction = scroll direction)
+                        idx_y = pointer_landmarks.landmark[TIP_IDS["index"]].y
+                        mid_y = pointer_landmarks.landmark[TIP_IDS["middle"]].y
+                        finger_y = (idx_y + mid_y) * 0.5
                         if self._previous_pointer_scroll_y is not None:
-                            delta = self._previous_pointer_scroll_y - index_y
-                            result["scroll_delta"] = int(delta * self.scroll_gain * 100)
-                        self._previous_pointer_scroll_y = index_y
+                            # Finger up (finger_y decreases) -> positive scroll (scroll up); finger down -> negative
+                            raw_delta = (self._previous_pointer_scroll_y - finger_y) * self.scroll_gain * 100
+                            # Smooth scroll: blend with previous for less jumpy movement
+                            scroll_alpha = 0.4
+                            self._scroll_smoothed = scroll_alpha * self._scroll_smoothed + (1.0 - scroll_alpha) * raw_delta
+                            result["scroll_delta"] = int(round(self._scroll_smoothed))
+                        self._previous_pointer_scroll_y = finger_y
                 else:
                     self._pointer_scroll_active = False
                     self._previous_pointer_scroll_y = None
+                    self._scroll_smoothed = 0.0
 
         if (
             pointer_landmarks is not None
